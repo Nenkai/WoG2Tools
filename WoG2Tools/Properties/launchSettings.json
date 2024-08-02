@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "WoG2Tools": {
+      "commandName": "Project",
+      "commandLineArgs": "image-to-png -i \"C:\\Users\\nenkai\\Desktop\\levelarrow.image\""
+    }
+  }
+}
