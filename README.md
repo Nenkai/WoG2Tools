@@ -2,4 +2,4 @@
 
 Tools for World of Goo 2.
 
-Currently .image -> .png
+Currently converts `.image` -> `.png`.
