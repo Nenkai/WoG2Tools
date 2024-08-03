@@ -5,11 +5,13 @@ using KtxSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace WoG2Tools;
 
 internal class Program
 {
-    public const string Version = "1.0.0";
+    public const string Version = "1.0.1";
 
     static void Main(string[] args)
     {
@@ -49,7 +51,7 @@ internal class Program
     {
         if (verbs.InputPaths.Count() == 1 && Directory.Exists(verbs.InputPaths.First()))
         {
-            foreach (var file in Directory.GetFiles(verbs.InputPaths.First(), "*", verbs.Recursive ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories))
+            foreach (var file in Directory.GetFiles(verbs.InputPaths.First(), "*.image", verbs.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly))
             {
                 try
                 {
@@ -86,8 +88,8 @@ internal class Program
             var boyImage = new BoyImage();
             boyImage.Read(imageStream);
 
-            Console.WriteLine($"- Original Dimensions: {boyImage.OriginalWidth}x{boyImage.OriginalHeight}");
-            Console.WriteLine($"- Pad Dimensions: {boyImage.Width}x{boyImage.Height}");
+            Console.WriteLine($"- Original Dimensions: {boyImage.Width}x{boyImage.Height}");
+            Console.WriteLine($"- Pad Dimensions: {boyImage.UnusedWidth}x{boyImage.UnusedHeight}");
 
             byte[] imageData = boyImage.GetKtxHeader();
 
@@ -103,10 +105,10 @@ internal class Program
                 switch (ktxStructure.header.glPixelFormat)
                 {
                     case GlPixelFormat.GL_RGBA:
-                        img = Image.LoadPixelData<Rgba32>(textureData, boyImage.Width, boyImage.Height);
+                        img = Image.LoadPixelData<Rgba32>(textureData, boyImage.UnusedWidth, boyImage.UnusedHeight);
                         break;
                     case GlPixelFormat.GL_RGB:
-                        img = Image.LoadPixelData<Rgb24>(textureData, boyImage.Width, boyImage.Height);
+                        img = Image.LoadPixelData<Rgb24>(textureData, boyImage.UnusedWidth, boyImage.UnusedHeight);
                         break;
                     default:
                         throw new NotImplementedException($"Ktx format {ktxStructure.header.glPixelFormat} not yet supported.");
@@ -116,6 +118,16 @@ internal class Program
                 Console.WriteLine($"Exporting -> {output}");
 
                 img.Save(Path.ChangeExtension(file, ".png"));
+                img.Dispose();
+
+                byte[] maskTextureData = boyImage.GetMaskData();
+                if (maskTextureData is not null)
+                {
+                    using var maskImage = Image.LoadPixelData<L8>(maskTextureData, boyImage.MaskWidth, boyImage.MaskHeight);
+                    maskImage.Save(Path.ChangeExtension(file, "") + "mask.png");
+                }
+
+
             }
         }
         catch (Exception e)

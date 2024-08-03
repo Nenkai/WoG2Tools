@@ -14,11 +14,15 @@ public class BoyImage
     public const uint Magic = 0x69796F62; // "boyi"
 
     public uint Version { get; set; }
-    public ushort OriginalWidth { get; set; }
-    public ushort OriginalHeight { get; set; }
     public ushort Width { get; set; }
     public ushort Height { get; set; }
-    private byte[] _imageData;
+    public ushort UnusedWidth { get; set; }
+    public ushort UnusedHeight { get; set; }
+    private byte[] _ktxHeaderData;
+
+    public ushort MaskWidth;
+    public ushort MaskHeight;
+    private byte[] _maskImageData;
 
     public void Read(Stream stream)
     {
@@ -27,33 +31,54 @@ public class BoyImage
             throw new IOException("Invalid magic/not a boyimage file.");
 
         uint version = bs.ReadUInt32();
-        OriginalWidth = bs.ReadUInt16();
-        OriginalHeight = bs.ReadUInt16();
         Width = bs.ReadUInt16();
         Height = bs.ReadUInt16();
-        uint compressedSize = bs.ReadUInt32();
-        uint decompressedSize = bs.ReadUInt32();
+        UnusedWidth = bs.ReadUInt16();
+        UnusedHeight = bs.ReadUInt16();
 
-        bs.Position += 0x0C;
-        byte[] compressedData = bs.ReadBytes((int)compressedSize);
-        byte[] outputBuffer = new byte[decompressedSize];
+        uint ktxCompressedSize = bs.ReadUInt32();
+        uint ktxDecompressedSize = bs.ReadUInt32();
+
+        MaskWidth = bs.ReadUInt16();
+        MaskHeight = bs.ReadUInt16();
+        uint compressedMaskSize = bs.ReadUInt32();
+        uint decompressedMaskSize = bs.ReadUInt32();
+
+        byte[] ktxCompressedData = bs.ReadBytes((int)ktxCompressedSize);
+        byte[] ktxDecompressedData = new byte[ktxDecompressedSize];
 
         var decompressor = new ZStdDecompressor();
-        if (decompressor.Decompress(outputBuffer, compressedData) == decompressedSize)
+        if (decompressor.Decompress(ktxDecompressedData, ktxCompressedData) == ktxDecompressedSize)
         {
-            _imageData = outputBuffer;
+            _ktxHeaderData = ktxDecompressedData;
         }
         else
         {
-            throw new IOException("Failed to decompress file - decompressed size did not match expected size");
+            throw new IOException("Failed to decompress texture/ktx data - decompressed size did not match expected size");
+        }
+
+        if (decompressedMaskSize != 0)
+        {
+            byte[] compressedMaskData = bs.ReadBytes((int)compressedMaskSize);
+            byte[] decompressedMaskData = new byte[decompressedMaskSize];
+            if (decompressor.Decompress(decompressedMaskData, compressedMaskData) == decompressedMaskSize)
+            {
+                _maskImageData = decompressedMaskData;
+            }
+            else
+            {
+                throw new IOException("Failed to decompress mask texture data - decompressed size did not match expected size");
+            }
         }
     }
 
     public byte[] GetKtxHeader()
     {
-        if (_imageData is null)
-            throw new ArgumentNullException("No image data, no image has been loaded.");
+        return _ktxHeaderData;
+    }
 
-        return _imageData;
+    public byte[] GetMaskData()
+    {
+        return _maskImageData;
     }
 }
